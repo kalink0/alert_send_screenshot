@@ -1,6 +1,5 @@
 // modify the login credential here
-var username = 'admin';
-var password = 'admin';
+
 
 var casper = require('casper').create({ verbose: true, logLevel: 'debug', viewportSize: { width: 1920, height: 600 }, waitTimeout: 10000 });
 
@@ -14,12 +13,24 @@ function removeShadowPath () {
     }
 }
 
+
+
+console.log("The session key: " + casper.cli.get(3));
+
+phantom.addCookie({
+    'name': 'splunkd_8000',
+    'value' : casper.cli.get(3),
+    'domain' : 'ubuntu-server',
+    'path' : '/'
+})
+
+
 if (casper.cli.has(0)) {
     casper.start(casper.cli.get(0), function () {
         this.page.paperSize = { format: 'A2', orientation: 'portrait', margin: '1cm' }
-        casper.waitForSelector('form.loginForm', function () {
-            this.fill('form', { username: username, password: password }, true);
-        });
+        //casper.waitForSelector('form.loginForm', function () {
+        //    this.fill('form', { username: username, password: password }, true);
+        //});
     });
 
     var duration = 30000;

@@ -32,7 +32,7 @@ def get_server_uri (results_link):
     print >> sys.stderr, "DEBUG Splunk Server URI: %s" % server_uri
     return server_uri
 
-def build_dashboard_url (server_uri, session_key, dashboard, app) :
+def build_dashboard_url (server_uri, dashboard, app) :
     '''
     Build the URL to the dashboard
     '''
@@ -40,11 +40,11 @@ def build_dashboard_url (server_uri, session_key, dashboard, app) :
     print >> sys.stderr, "DEBUG dashboard url: %s" % server_uri
     return dashboard_url
 
-def create_screenshot_dashboard(dashboard_url):
+def create_screenshot_dashboard(dashboard_url, session_key):
     expand_system_path_variable()
     print >> sys.stderr, "DEBUG Call casperjs for screenshot"   
     # run casperjs
-    subprocess.call([os.path.join(dir_path, casper_folder, "bin", "casperjs"), os.path.join(dir_path, "screenshot.js"), dashboard_url, "15", "test"])
+    subprocess.call([os.path.join(dir_path, casper_folder, "bin", "casperjs"), os.path.join(dir_path, "screenshot.js"), dashboard_url, "15", "test", session_key, "admin"])
 
     return True
 
@@ -60,10 +60,11 @@ if __name__ == "__main__":
         session_key = payload.get('session_key')
         dashboard = payload['configuration'].get('dashboard')
         app = payload['configuration'].get('app')
-        print >> sys.stderr, "DEBUG Dashboard name: %s, App name: %s, Session_Key: %s" % (dashboard, app,session_key)
-        dashboard_url = build_dashboard_url(server_uri, session_key, dashboard, app)
-        if not create_screenshot_dashboard(dashboard_url):
+        print >> sys.stderr, "DEBUG Dashboard name: %s, App name: %s, Session_Key: %s" % (dashboard, app, session_key)
+        dashboard_url = build_dashboard_url(server_uri, dashboard, app)
+        if not create_screenshot_dashboard(dashboard_url, session_key):
             sys.exit(2)
+        # TODO: send mail with screenshot
     except Exception, e:
         print >> sys.stderr, "ERROR Unexpected error: %s" % e
         sys.exit(3)
