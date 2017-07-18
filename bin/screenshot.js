@@ -18,6 +18,7 @@ function removeShadowPath () {
 console.log("The session key: " + casper.cli.get(3));
 
 phantom.addCookie({
+    // TODO: make domain and name use parameters
     'name': 'splunkd_8000',
     'value' : casper.cli.get(3),
     'domain' : 'ubuntu-server',
