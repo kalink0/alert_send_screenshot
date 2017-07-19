@@ -114,7 +114,7 @@ def send_mail_screenshot(settings, payload, session_key, file_type):
         serverConfJSON = sslHelper.getServerSettings(session_key)
         # Pass in settings from alert_actions.conf into context
         ctx = sslHelper.createSSLContextFromSettings(
-            sslConfJSON=settings,
+            sslConfJSON=settings,   # TODO: Prüfen auf Fehler, da es bei einem Kunden mit eigenen Zertifikaten NICHT geht!
             serverConfJSON=serverConfJSON,
             isClientContext=True)
 
@@ -128,7 +128,7 @@ def send_mail_screenshot(settings, payload, session_key, file_type):
 
         if use_tls:
             smtp.starttls(ctx)
-        if len(username) > 0 and password is not None and len(password) >0:
+        if username is not None and len(username) > 0 and password is not None and len(password) >0:
             smtp.login(username, password)
 
         smtp.sendmail(sender, recipients, email.as_string())
@@ -184,7 +184,6 @@ if __name__ == "__main__":
         print >> sys.stderr, "FATAL Unsupported execution mode (expected --execute flag)"
         sys.exit(1)
     try:
-        global FILE_NAME
         payload = json.loads(sys.stdin.read())
         print >> sys.stderr, "DEBUG payload from Splunk in JSON format: %s" % payload
         server_uri = get_server_uri(payload.get('results_link'))
