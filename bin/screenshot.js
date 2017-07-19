@@ -1,6 +1,3 @@
-// modify the login credential here
-
-
 var casper = require('casper').create({ verbose: true, logLevel: 'debug', viewportSize: { width: 1920, height: 600 }, waitTimeout: 10000 });
 
 function removeShadowPath () {
@@ -14,14 +11,11 @@ function removeShadowPath () {
 }
 
 
-
-console.log("The session key: " + casper.cli.get(3));
-
 phantom.addCookie({
     // TODO: make domain and name use parameters
-    'name': 'splunkd_8000',
+    'name': 'splunkd_' + casper.cli.get(5),
     'value' : casper.cli.get(3),
-    'domain' : 'ubuntu-server',
+    'domain' : casper.cli.get(4),
     'path' : '/'
 })
 
@@ -41,8 +35,8 @@ if (casper.cli.has(0)) {
     casper.then(function () {
         this.wait(duration, function () {
             this.page.evaluate(removeShadowPath);
-            this.capture(casper.cli.has(2) ? casper.cli.get(2) + '.pdf' : 'report.pdf', undefined, { type: 'pdf' });
-            this.capture(casper.cli.has(2) ? casper.cli.get(2) + '.png' : 'report.png');
+            //this.capture(casper.cli.has(2) ? casper.cli.get(2) + '.pdf' : 'report.pdf', undefined, { type: 'pdf' });
+            this.capture(casper.cli.get(2) + '.' + casper.cli.get(6));
         });
     });
 }

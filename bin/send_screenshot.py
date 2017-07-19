@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import os
+import datetime
 import sys
 import json
 import urllib2
@@ -32,13 +33,15 @@ CASPER_FOLDER = "casperjs-1.1.4-1"
 PHANTOM_FOLDER = "phantomjs-2.1.1-linux-x86_64"
 # get current directory
 DIR_PATH = os.path.dirname(os.path.realpath(__file__))
-FILE_NAME = "screenshot"
+FILE_NAME = "taken_screenshot"
+ADD_PARAMS = "hideSplunkBar=true&hideAppBar=true&hideFooter=true&hideEdit=true"
+
 print >> sys.stderr, "DEBUG Casper: %s, Phantom: %s, Directory: %s" % (CASPER_FOLDER, PHANTOM_FOLDER, DIR_PATH)
 
 
 def get_alert_actions(sessionKey):
     '''
-    Get Settings out of the alert_actions.conf for stanza mail
+    Get Settings out of the alert_actions.conf for stanza email
     '''
     settings = None
     try:
@@ -49,34 +52,34 @@ def get_alert_actions(sessionKey):
 
     return settings
 
-def build_email_object(settings):
+def build_email_object(settings, payload):
     '''
     Method to build the email object
     '''
+    #TODO Make multiple recipients possible
     email = emailBody = MIMEMultipart()
-    email['From'] = sender = settings.get('from', 'splunk') 
-    email['To'] = "neumann@consist.de"
-    email['Subject'] = settings.get('subject', 'Message from Splunk')
-    print >> sys.stderr, "DEBUG Email object built From: %s, To: %s, Subject: %s" % (email['To'], email['From'], email['Subject'])
+    email['From'] = settings.get('from', 'splunk') 
+    email['To'] = payload['configuration'].get('recipients')
+    email['Subject'] = payload['configuration'].get('subject', 'Message from Splunk')
+    print >> sys.stderr, "DEBUG Email object built From: %s, To: %s, Subject: %s" % (email['From'], email['To'], email['Subject'])
     return email
 
-def build_mime_attachment():
+def build_mime_attachment(file_type):
     '''
     Create the MIME attachment
     '''
-    # TODO: Change file extensions to variable!
-    with open(os.path.join(DIR_PATH, FILE_NAME + ".png"), 'rb') as fp:
+    with open(os.path.join(DIR_PATH, FILE_NAME + "." + file_type), 'rb') as fp:
         img = MIMEImage(fp.read())
+    img.add_header('Content-Disposition', 'attachment', filename=FILE_NAME + "." + file_type)
     return img
 
-def send_mail_screenshot(settings, session_key):
+def send_mail_screenshot(settings, payload, session_key, file_type):
     '''
     Setup connection, attach file to mail and send out mail
     '''
     # Get Mail object
-    email = build_email_object(settings)
-
-    email.attach(build_mime_attachment())
+    email = build_email_object(settings, payload)
+    email.attach(build_mime_attachment(file_type))
     
     sender     = email['From']
     use_ssl    = normalizeBoolean(settings.get('.use_ssl', False))
@@ -130,6 +133,7 @@ def send_mail_screenshot(settings, session_key):
 
         smtp.sendmail(sender, recipients, email.as_string())
         smtp.quit()
+        print >> sys.stderr, "INFO Sending mail successfull: %s" % mail_log_msg
 
     except Exception, e:
         print >> sys.stderr, "ERROR Sending mail unsuccessful: %s / %s" % (mail_log_msg, e)
@@ -157,16 +161,19 @@ def build_dashboard_url (server_uri, dashboard, app) :
     '''
     Build the URL to the dashboard
     '''
-    dashboard_url = server_uri + "/app/" + app +"/" + dashboard
-    print >> sys.stderr, "DEBUG dashboard url: %s" % server_uri
+    dashboard_url = server_uri + "/app/" + app +"/" + dashboard + "?" + ADD_PARAMS
+    print >> sys.stderr, "DEBUG dashboard url: %s" % dashboard_url
     return dashboard_url
 
-def create_screenshot_dashboard(dashboard_url, session_key):
+def create_screenshot_dashboard(dashboard_url, session_key, timeout, cookie_domain, splunkd_port, file_type):
+    '''
+    Set all necessary pathes and start casperjs to take the screenshot
+    '''
     expand_system_path_variable()
     print >> sys.stderr, "DEBUG Call casperjs for screenshot"   
     # run casperjs
     try:
-        subprocess.call([os.path.join(DIR_PATH, CASPER_FOLDER, "bin", "casperjs"), os.path.join(DIR_PATH, "screenshot.js"), dashboard_url, "15", FILE_NAME, session_key, "admin"])
+        subprocess.call([os.path.join(DIR_PATH, CASPER_FOLDER, "bin", "casperjs"), os.path.join(DIR_PATH, "screenshot.js"), dashboard_url, timeout, FILE_NAME, session_key, cookie_domain, splunkd_port, file_type], stdout=sys.stdout, stderr=sys.stdout)
         return True
     except Exception, e:
         print >> sys.stderr, "ERROR Cannot create Screenshot: %s" % e
@@ -177,6 +184,7 @@ if __name__ == "__main__":
         print >> sys.stderr, "FATAL Unsupported execution mode (expected --execute flag)"
         sys.exit(1)
     try:
+        global FILE_NAME
         payload = json.loads(sys.stdin.read())
         print >> sys.stderr, "DEBUG payload from Splunk in JSON format: %s" % payload
         server_uri = get_server_uri(payload.get('results_link'))
@@ -185,11 +193,20 @@ if __name__ == "__main__":
         app = payload['configuration'].get('app')
         print >> sys.stderr, "DEBUG Dashboard name: %s, App name: %s, Session_Key: %s" % (dashboard, app, session_key)
         dashboard_url = build_dashboard_url(server_uri, dashboard, app)
-        if not create_screenshot_dashboard(dashboard_url, session_key):
+        timeout = payload['configuration'].get('timeout')
+        cookie_domain = urlparse.urlsplit(payload.get('results_link')).hostname
+        splunkd_port = payload['configuration'].get('splunkd_port')
+        print >> sys.stderr, "DEBUG Timeout: %s, cookie_domain: %s, splunkd port: %s" % (timeout, cookie_domain, splunkd_port)
+        FILE_NAME = payload.get('app') + "_" + payload.get('search_name') + "_" + datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+        file_type = payload['configuration'].get('type')
+        print >> sys.stderr, "DEBUG File name %s File type %s" % (FILE_NAME, file_type)
+        if not create_screenshot_dashboard(dashboard_url, session_key, timeout, cookie_domain, splunkd_port, file_type):
             sys.exit(2)
         alert_actions_settings = get_alert_actions(session_key)
-        if not send_mail_screenshot(alert_actions_settings, session_key):
+        if not send_mail_screenshot(alert_actions_settings, payload, session_key, file_type):
             sys.exit(3)
+        os.remove(os.path.join(DIR_PATH, FILE_NAME + "." + file_type))
+        print >> sys.stderr, "DEBUG Files deleted: %s" % os.path.join(DIR_PATH, FILE_NAME + "." + file_type)
     except Exception, e:
         print >> sys.stderr, "ERROR Unexpected error: %s" % e
         sys.exit(4)
