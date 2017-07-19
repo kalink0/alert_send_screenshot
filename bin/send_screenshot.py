@@ -113,10 +113,24 @@ def send_mail_screenshot(settings, payload, session_key, file_type):
         sslHelper = ssl_context.SSLHelper()
         serverConfJSON = sslHelper.getServerSettings(session_key)
         # Pass in settings from alert_actions.conf into context
-        ctx = sslHelper.createSSLContextFromSettings(
-            sslConfJSON=settings,   # TODO: Prüfen auf Fehler, da es bei einem Kunden mit eigenen Zertifikaten NICHT geht!
-            serverConfJSON=serverConfJSON,
-            isClientContext=True)
+        # Version 6.6
+        
+        try:
+            ctx = sslHelper.createSSLContextFromSettings(
+                sslConfJSON=settings,   # TODO: Prüfen auf Fehler, da es bei einem Kunden mit eigenen Zertifikaten NICHT geht!
+                serverConfJSON=serverConfJSON,
+                isClientContext=True)
+        except Exception, e:
+            print >> sys.stderr, "WARN Setting up SSL context with Splunk > 6.5.x version not possible: %s" % e
+            try:
+            # Version 6.4
+                ctx = sslHelper.createSSLContextFromSettings(
+                    confJSON=settings,
+                    sessionKey=session_key,
+                    isClientContext=True)
+            except Exception, e:
+                print >> sys.stderr, "WARN Setting up SSL context with Splunk < 6.6.x version not possible: %s" % e
+                raise
 
         # send the mail
         if not use_ssl:
@@ -204,8 +218,9 @@ if __name__ == "__main__":
         alert_actions_settings = get_alert_actions(session_key)
         if not send_mail_screenshot(alert_actions_settings, payload, session_key, file_type):
             sys.exit(3)
-        os.remove(os.path.join(DIR_PATH, FILE_NAME + "." + file_type))
-        print >> sys.stderr, "DEBUG Files deleted: %s" % os.path.join(DIR_PATH, FILE_NAME + "." + file_type)
     except Exception, e:
         print >> sys.stderr, "ERROR Unexpected error: %s" % e
         sys.exit(4)
+    finally:
+        os.remove(os.path.join(DIR_PATH, FILE_NAME + "." + file_type))
+        print >> sys.stderr, "DEBUG Files deleted: %s" % os.path.join(DIR_PATH, FILE_NAME + "." + file_type)
