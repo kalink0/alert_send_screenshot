@@ -54,12 +54,14 @@ def get_alert_actions(sessionKey):
 
 def build_email_object(settings, payload):
     '''
-    Method to build the email object
+    Method to build the email object incl. message
     '''
     email = emailBody = MIMEMultipart()
     email['From'] = settings.get('from', 'splunk') 
     email['To'] = payload['configuration'].get('recipients')
-    email['Subject'] = payload['configuration'].get('subject', 'Message from Splunk')
+    email['Subject'] = payload['configuration'].get('subject')
+    message = MIMEText(payload['configuration'].get('message'))
+    email.attach(message)
     print >> sys.stderr, "DEBUG Email object built From: %s, To: %s, Subject: %s" % (email['From'], email['To'], email['Subject'])
     return email
 
@@ -125,7 +127,7 @@ def send_mail_screenshot(settings, payload, session_key, file_type):
         
         try:
             ctx = sslHelper.createSSLContextFromSettings(
-                sslConfJSON=settings,   # TODO: Checkk for error because this must be commented to work on customer site
+                sslConfJSON=settings,   # TODO: Check for error because this must be commented to work on customer site 
                 serverConfJSON=serverConfJSON,
                 isClientContext=True)
         except Exception, e:
