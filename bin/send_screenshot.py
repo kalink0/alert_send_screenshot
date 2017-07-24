@@ -56,7 +56,6 @@ def build_email_object(settings, payload):
     '''
     Method to build the email object
     '''
-    #TODO Make multiple recipients possible
     email = emailBody = MIMEMultipart()
     email['From'] = settings.get('from', 'splunk') 
     email['To'] = payload['configuration'].get('recipients')
@@ -68,10 +67,19 @@ def build_mime_attachment(file_type):
     '''
     Create the MIME attachment
     '''
-    with open(os.path.join(DIR_PATH, FILE_NAME + "." + file_type), 'rb') as fp:
-        img = MIMEImage(fp.read())
-    img.add_header('Content-Disposition', 'attachment', filename=FILE_NAME + "." + file_type)
-    return img
+    try:
+        with open(os.path.join(DIR_PATH, FILE_NAME + "." + file_type), 'rb') as fp:
+            if file_type == 'png':
+                img = MIMEImage(fp.read())
+            if file_type == 'pdf':
+                img = MIMEApplication(fp.read(), 'pdf')
+
+        img.add_header('Content-Disposition', 'attachment', filename=FILE_NAME + "." + file_type)
+        print >> sys.stderr, "DEBUG Attachment successfully created"
+        return img
+    except Exception, e:
+        print >> sys.stderr, "ERROR Attachment could not be created: %s" % e
+
 
 def send_mail_screenshot(settings, payload, session_key, file_type):
     '''
@@ -117,7 +125,7 @@ def send_mail_screenshot(settings, payload, session_key, file_type):
         
         try:
             ctx = sslHelper.createSSLContextFromSettings(
-                sslConfJSON=settings,   # TODO: Prüfen auf Fehler, da es bei einem Kunden mit eigenen Zertifikaten NICHT geht!
+                sslConfJSON=settings,   # TODO: Checkk for error because this must be commented to work on customer site
                 serverConfJSON=serverConfJSON,
                 isClientContext=True)
         except Exception, e:
@@ -175,11 +183,15 @@ def build_dashboard_url (server_uri, dashboard, app) :
     '''
     Build the URL to the dashboard
     '''
-    dashboard_url = server_uri + "/app/" + app +"/" + dashboard + "?" + ADD_PARAMS
+    # Check if there are already given parameters in the dashboard name
+    if '?' in dashboard:
+        dashboard_url = server_uri + "/app/" + app +"/" + dashboard + "&" + ADD_PARAMS
+    else:
+        dashboard_url = server_uri + "/app/" + app +"/" + dashboard + "?" + ADD_PARAMS
     print >> sys.stderr, "DEBUG dashboard url: %s" % dashboard_url
     return dashboard_url
 
-def create_screenshot_dashboard(dashboard_url, session_key, timeout, cookie_domain, splunkd_port, file_type):
+def create_screenshot_dashboard(dashboard_url, session_key, timeout, cookie_domain, splunkweb_port, file_type):
     '''
     Set all necessary pathes and start casperjs to take the screenshot
     '''
@@ -187,7 +199,7 @@ def create_screenshot_dashboard(dashboard_url, session_key, timeout, cookie_doma
     print >> sys.stderr, "DEBUG Call casperjs for screenshot"   
     # run casperjs
     try:
-        subprocess.call([os.path.join(DIR_PATH, CASPER_FOLDER, "bin", "casperjs"), os.path.join(DIR_PATH, "screenshot.js"), dashboard_url, timeout, FILE_NAME, session_key, cookie_domain, splunkd_port, file_type], stdout=sys.stdout, stderr=sys.stdout)
+        subprocess.call([os.path.join(DIR_PATH, CASPER_FOLDER, "bin", "casperjs"), os.path.join(DIR_PATH, "screenshot.js"), dashboard_url, timeout, FILE_NAME, session_key, cookie_domain, splunkweb_port, file_type], stdout=sys.stdout, stderr=sys.stdout)
         return True
     except Exception, e:
         print >> sys.stderr, "ERROR Cannot create Screenshot: %s" % e
@@ -208,12 +220,12 @@ if __name__ == "__main__":
         dashboard_url = build_dashboard_url(server_uri, dashboard, app)
         timeout = payload['configuration'].get('timeout')
         cookie_domain = urlparse.urlsplit(payload.get('results_link')).hostname
-        splunkd_port = payload['configuration'].get('splunkd_port')
-        print >> sys.stderr, "DEBUG Timeout: %s, cookie_domain: %s, splunkd port: %s" % (timeout, cookie_domain, splunkd_port)
+        splunkweb_port = payload['configuration'].get('splunkweb_port')
+        print >> sys.stderr, "DEBUG Timeout: %s, cookie_domain: %s, splunkweb port: %s" % (timeout, cookie_domain, splunkweb_port)
         FILE_NAME = payload.get('app') + "_" + payload.get('search_name') + "_" + datetime.datetime.now().strftime("%Y%m%d%H%M%S")
         file_type = payload['configuration'].get('type')
         print >> sys.stderr, "DEBUG File name %s File type %s" % (FILE_NAME, file_type)
-        if not create_screenshot_dashboard(dashboard_url, session_key, timeout, cookie_domain, splunkd_port, file_type):
+        if not create_screenshot_dashboard(dashboard_url, session_key, timeout, cookie_domain, splunkweb_port, file_type):
             sys.exit(2)
         alert_actions_settings = get_alert_actions(session_key)
         if not send_mail_screenshot(alert_actions_settings, payload, session_key, file_type):

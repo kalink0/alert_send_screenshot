@@ -34,8 +34,9 @@
     <div class="control-group">
         <label for="send_screenshot_type"> File Type </label>
         <div class="controls">
-            <input type="radio" name="action.send_screenshot.param.type" id="send_screenshot_type" value="pdf" checked="checked">.pdf</input>
-            <input type="radio" name="action.send_screenshot.param.type" id="send_screenshot_type" value="png">.png</input>          
+            <!-- <input type="radio" name="action.send_screenshot.param.type" id="send_screenshot_type" value="pdf" checked="checked">.pdf</input> -->
+            <input type="radio" name="action.send_screenshot.param.type" id="send_screenshot_type" value="pdf" checked="checked">.pdf</input> 
+            <input type="radio" name="action.send_screenshot.param.type" id="send_screenshot_type" value="png" checked="checked">.png</input>          
         </div>
     </div>
     <div class="control-group">
@@ -45,9 +46,9 @@
         </div>
     </div>
     <div class="control-group">
-        <label for="send_screenshot_splunkd_port"> Splunkd port </label>
+        <label for="send_screenshot_splunkweb_port"> Splunkweb port </label>
         <div class="controls">
-            <input type="text" name="action.send_screenshot.param.splunkd_port" id="send_screenshot_splunkd_port" placeholder="8000" />          
+            <input type="text" name="action.send_screenshot.param.splunkweb_port" id="send_screenshot_splunkweb_port" placeholder="8000" />          
         </div>
     </div>
 </form>
